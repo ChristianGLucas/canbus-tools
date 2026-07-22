@@ -1,0 +1,201 @@
+// This file defines the data contracts (messages) for your Axiom package.
+// Every node's --input and --output refers to a message defined here.
+//
+// Run `axiom create message <Name>` to scaffold a new message below.
+// Run `axiom generate` to compile these definitions into language bindings in gen/.
+//
+// DOCUMENTATION
+//   Comments written directly above a message or field declaration are extracted
+//   automatically at publish time and shown in the Axiom registry as documentation.
+//   Write your descriptions there — no separate doc files needed.
+//
+//   Leading comment  (no blank line before the declaration) → registry description ✓
+//   Detached comment (blank line before the declaration)    → ignored by registry  ✗
+//
+// This file is yours to edit. Axiom only appends new message blocks — it never
+// overwrites or removes content you have written.
+
+syntax = "proto3";
+
+package christiangeorgelucas.canbus_tools;
+
+// A CAN database's source text plus its format — the canonical envelope every
+// node in this package consumes. `format` is one of "dbc", "kcd", "sym",
+// "arxml" (case-insensitive); an empty string means "infer from content"
+// (nodes sniff the text: DBC starts with a BU_/BO_ section keyword, KCD/ARXML
+// are XML, SYM starts with "FormatVersion"). Malformed or empty content, or
+// an unrecognized/unsupported format, returns a structured error rather than
+// a crash.
+message CanDatabase {
+  string content = 1;
+  string format = 2;
+}
+
+// One CAN message (frame definition) as declared in the database.
+message CanMessageInfo {
+  // The CAN arbitration ID. Standard (11-bit) or extended (29-bit) per
+  // is_extended_id; never includes the extended-id marker bit.
+  uint32 frame_id = 1;
+  bool is_extended_id = 2;
+  string name = 3;
+  // Declared payload length in bytes (the DLC).
+  uint32 length = 4;
+  repeated string senders = 5;
+  string comment = 6;
+  repeated CanSignalInfo signals = 7;
+  // True if any signal in this message is a multiplexer or is multiplexed.
+  bool is_multiplexed = 8;
+  // Cycle time in milliseconds, 0 if not specified by the database.
+  uint32 cycle_time_ms = 9;
+}
+
+// One signal (a named bitfield with linear scaling) within a CAN message.
+message CanSignalInfo {
+  string name = 1;
+  // Index (0-based) of the signal's least-significant bit within the frame,
+  // counted the way the source format counts it (DBC bit numbering).
+  uint32 start_bit = 2;
+  uint32 length = 3;
+  // "little_endian" (Intel) or "big_endian" (Motorola).
+  string byte_order = 4;
+  bool is_signed = 5;
+  bool is_float = 6;
+  // Physical value = raw * factor + offset.
+  double factor = 7;
+  double offset = 8;
+  double min = 9;
+  double max = 10;
+  // Free-text engineering unit as authored in the database (e.g. "km/h",
+  // "degC", "%", "rpm") — not normalized against any external unit registry.
+  string unit = 11;
+  repeated string receivers = 12;
+  string comment = 13;
+  // True if this signal selects which multiplexed signal group is active.
+  bool is_multiplexer = 14;
+  // True if this signal is only present when the frame's multiplexer signal
+  // equals one of multiplexer_ids.
+  bool is_multiplexed = 15;
+  // The multiplexer-selector values this signal is active for, e.g. [0, 2].
+  // Empty when is_multiplexed is false.
+  repeated int64 multiplexer_ids = 16;
+  // Enumerated raw-value -> human label table, e.g. {0: "OFF", 1: "ON"}.
+  // Empty when the database defines no value table for this signal.
+  map<int64, string> value_table = 17;
+}
+
+// A structured, deterministic failure. Empty on success.
+message CanError {
+  // Stable machine-readable code:
+  //   INVALID_DATABASE   — content is empty, malformed, or the format could
+  //                        not be determined/parsed.
+  //   UNSUPPORTED_FORMAT — format is set to something this package does not
+  //                        handle.
+  //   MESSAGE_NOT_FOUND  — no message in the database matches the given name
+  //                        or frame_id.
+  //   SIGNAL_NOT_FOUND   — a referenced signal name does not exist on the
+  //                        resolved message.
+  //   OUT_OF_RANGE       — a signal value is outside [min, max] and strict
+  //                        mode is on, or a raw payload does not fit the
+  //                        message's declared length.
+  //   TOO_LARGE          — an input exceeded this package's size bound.
+  //   INVALID_INPUT      — malformed input that isn't a database itself,
+  //                        e.g. unparseable hex payload text, or neither
+  //                        message_name nor frame_id was given.
+  //   INTERNAL           — an unexpected failure the package could not
+  //                        classify more specifically.
+  string code = 1;
+  string message = 2;
+}
+
+message ParseDatabaseInput {
+  CanDatabase database = 1;
+}
+
+message ParseDatabaseOutput {
+  // The format actually used to parse (resolved from input.format or sniffed).
+  string format = 1;
+  repeated CanMessageInfo messages = 2;
+  CanError error = 3;
+}
+
+message EncodeFrameInput {
+  CanDatabase database = 1;
+  // Identify the message by name (preferred if non-empty) or by frame_id.
+  string message_name = 2;
+  // -1 means "not provided"; use message_name instead.
+  int64 frame_id = 3;
+  // Physical (scaled) values keyed by signal name. Any signal not listed
+  // defaults to its raw value 0 (i.e. offset).
+  map<string, double> signal_values = 4;
+  // When true, a signal value outside [min, max] (if the database declares
+  // a non-degenerate range) fails with OUT_OF_RANGE instead of being encoded
+  // as-is.
+  bool strict = 5;
+}
+
+message EncodeFrameOutput {
+  // The encoded payload, hex-encoded (lowercase, no separators), exactly
+  // `dlc` bytes long.
+  string data_hex = 1;
+  uint32 frame_id = 2;
+  string message_name = 3;
+  uint32 dlc = 4;
+  CanError error = 5;
+}
+
+message DecodeFrameInput {
+  CanDatabase database = 1;
+  string message_name = 2;
+  // -1 means "not provided"; use message_name instead.
+  int64 frame_id = 3;
+  // The raw payload, hex-encoded (whitespace and a leading "0x" tolerated).
+  string data_hex = 4;
+}
+
+message DecodeFrameOutput {
+  string message_name = 1;
+  uint32 frame_id = 2;
+  // Physical (scaled) values keyed by signal name.
+  map<string, double> signal_values = 3;
+  // Human labels from the signal's value table, keyed by signal name; only
+  // present for signals whose raw value matches a defined table entry.
+  map<string, string> signal_labels = 4;
+  // Free-text unit per signal name, mirroring CanSignalInfo.unit.
+  map<string, string> signal_units = 5;
+  CanError error = 6;
+}
+
+message ConvertDatabaseInput {
+  CanDatabase database = 1;
+  // Target format: "dbc", "kcd", or "sym".
+  string target_format = 2;
+}
+
+message ConvertDatabaseOutput {
+  // content is the converted database text, format equals target_format.
+  CanDatabase database = 1;
+  CanError error = 2;
+}
+
+message CompareDatabasesInput {
+  CanDatabase database_a = 1;
+  CanDatabase database_b = 2;
+}
+
+// A single structural difference between two database revisions.
+message CanDatabaseDiff {
+  // One of: "message_added", "message_removed", "message_changed",
+  // "signal_added", "signal_removed", "signal_changed".
+  string kind = 1;
+  // The message name the diff belongs to.
+  string message_name = 2;
+  // The signal name the diff belongs to; empty for message-level diffs.
+  string signal_name = 3;
+  // Short human-readable description, e.g. "factor changed 0.1 -> 0.5".
+  string detail = 4;
+}
+
+message CompareDatabasesOutput {
+  repeated CanDatabaseDiff diffs = 1;
+  CanError error = 2;
+}

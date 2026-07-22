@@ -1,0 +1,72 @@
+name: christiangeorgelucas/canbus-tools
+version: 0.1.0
+language: python
+description: >-
+  Composable Axiom nodes for automotive CAN-bus message encoding, decoding,
+  and database introspection — parse a DBC/KCD/SYM/ARXML CAN database into
+  its messages and scaled signals (bit position, byte order, factor/offset,
+  min/max, unit, value tables), encode named signal values into a raw CAN
+  frame payload, decode raw frame bytes back into named physical signal
+  values, convert a database between formats, and structurally diff two
+  database revisions. Wraps canmatrix (BSD-3-Clause); pure input-to-output,
+  deterministic, bounded input, structured errors — no state, filesystem,
+  network, or secrets, and no dependency on any live CAN bus interface.
+license: MIT
+author: Christian George Lucas
+tags:
+  - can-bus
+  - automotive
+  - dbc
+  - arxml
+  - kcd
+  - canmatrix
+  - embedded
+  - vehicle
+nodes:
+    - name: ParseDatabase
+      description: >-
+        Parse a CAN database (DBC, KCD, SYM, or ARXML text) into its full
+        structural contents: every message (arbitration ID, name, DLC,
+        senders, cycle time) and every signal within it (start bit, bit
+        length, byte order, signed/float, linear factor/offset, min/max,
+        unit, receivers, multiplexing, and any enumerated value table).
+        format may be left empty to auto-detect from the content.
+      input: ParseDatabaseInput
+      output: ParseDatabaseOutput
+    - name: EncodeFrame
+      description: >-
+        Encode one CAN message's named physical signal values into the raw
+        payload bytes a device would put on the bus, per the message's
+        definition in the given database. Identify the message by name or
+        by frame_id. In strict mode, a signal value outside its declared
+        [min, max] range fails with OUT_OF_RANGE instead of being encoded
+        silently.
+      input: EncodeFrameInput
+      output: EncodeFrameOutput
+    - name: DecodeFrame
+      description: >-
+        Decode a raw CAN frame's payload bytes into named, physically-scaled
+        signal values (value = raw * factor + offset), per the message
+        definition in the given database — the inverse of EncodeFrame. Also
+        returns each signal's declared unit and, where the database defines
+        an enumerated value table, the human-readable label for the decoded
+        raw value.
+      input: DecodeFrameInput
+      output: DecodeFrameOutput
+    - name: ConvertDatabase
+      description: >-
+        Convert a CAN database from its source format into another supported
+        format (dbc, kcd, or sym), re-serializing every message and signal
+        it contains. Useful for migrating a database authored in one tool's
+        native format to one another tool expects.
+      input: ConvertDatabaseInput
+      output: ConvertDatabaseOutput
+    - name: CompareDatabases
+      description: >-
+        Structurally diff two CAN database revisions and report every
+        message and signal added, removed, or changed (e.g. a moved start
+        bit, a rescaled factor/offset, a widened range, a renamed receiver)
+        — useful for reviewing what an updated DBC actually changes before
+        it ships to a fleet.
+      input: CompareDatabasesInput
+      output: CompareDatabasesOutput

@@ -1,0 +1,5 @@
+# Add your Python runtime dependencies here, one per line.
+canmatrix==1.2
+lxml==6.1.1
+attrs==26.1.0
+click==8.4.2
