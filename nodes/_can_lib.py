@@ -207,7 +207,13 @@ def frame_to_dict(frame) -> dict:
     )
 
 
-def resolve_frame(db, message_name: str, frame_id: int):
+def resolve_frame(db, message_name: str, frame_id: typing.Optional[int]):
+    """`frame_id` must be `None` when the caller didn't set that field — the
+    proto has it as `optional uint32` precisely so "not provided" can never
+    collide with the legitimate arbitration id 0 (a sentinel like -1 would
+    still be fine, but relying on proto3's bare-scalar default of 0 is not:
+    a request that omits both fields would otherwise silently resolve
+    against whichever message happens to have frame_id 0)."""
     if message_name:
         f = db.frame_by_name(message_name)
         if f is None:
@@ -215,7 +221,7 @@ def resolve_frame(db, message_name: str, frame_id: int):
                 "MESSAGE_NOT_FOUND", f"no message named {message_name!r}"
             )
         return f
-    if frame_id is not None and frame_id >= 0:
+    if frame_id is not None:
         for f in db.frames:
             if int(f.arbitration_id.id) == frame_id:
                 return f

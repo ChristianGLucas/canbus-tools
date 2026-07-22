@@ -21,7 +21,8 @@ def decode_frame(ax: AxiomContext, input: DecodeFrameInput) -> DecodeFrameOutput
     """
     try:
         db, _fmt = load_database(input.database.content, input.database.format)
-        frame = resolve_frame(db, input.message_name, input.frame_id)
+        frame_id = input.frame_id if input.HasField("frame_id") else None
+        frame = resolve_frame(db, input.message_name, frame_id)
         raw = hex_to_bytes(input.data_hex)
         values, labels, units = _decode_frame(frame, raw)
         return DecodeFrameOutput(

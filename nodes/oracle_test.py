@@ -48,7 +48,7 @@ def test_encode_frame_matches_independent_reference_implementation():
         expected = _oracle_encode(start_byte, length_bytes, factor, offset, is_signed, value)
         result = encode_frame(
             ax,
-            EncodeFrameInput(database=DB, message_name="EngineData", frame_id=-1, signal_values={signal: value}),
+            EncodeFrameInput(database=DB, message_name="EngineData", signal_values={signal: value}),
         )
         assert result.error.code == "", (signal, value, result.error.message)
         assert bytes.fromhex(result.data_hex) == expected, (signal, value)
@@ -62,7 +62,7 @@ def test_decode_frame_matches_independent_reference_implementation():
         result = decode_frame(
             ax,
             DecodeFrameInput(
-                database=DB, message_name="EngineData", frame_id=-1, data_hex=raw_bytes.hex()
+                database=DB, message_name="EngineData", data_hex=raw_bytes.hex()
             ),
         )
         assert result.error.code == ""

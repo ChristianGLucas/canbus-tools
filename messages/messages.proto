@@ -122,8 +122,11 @@ message EncodeFrameInput {
   CanDatabase database = 1;
   // Identify the message by name (preferred if non-empty) or by frame_id.
   string message_name = 2;
-  // -1 means "not provided"; use message_name instead.
-  int64 frame_id = 3;
+  // Unset means "not provided; use message_name instead" — explicit
+  // presence-tracked (proto3 `optional`), NOT a sentinel value, because
+  // frame_id 0 is a legitimate arbitration id and would otherwise be
+  // indistinguishable from "the caller didn't set this field".
+  optional uint32 frame_id = 3;
   // Physical (scaled) values keyed by signal name. Any signal not listed
   // defaults to its raw value 0 (i.e. offset).
   map<string, double> signal_values = 4;
@@ -146,8 +149,11 @@ message EncodeFrameOutput {
 message DecodeFrameInput {
   CanDatabase database = 1;
   string message_name = 2;
-  // -1 means "not provided"; use message_name instead.
-  int64 frame_id = 3;
+  // Unset means "not provided; use message_name instead" — explicit
+  // presence-tracked (proto3 `optional`), NOT a sentinel value, because
+  // frame_id 0 is a legitimate arbitration id and would otherwise be
+  // indistinguishable from "the caller didn't set this field".
+  optional uint32 frame_id = 3;
   // The raw payload, hex-encoded (whitespace and a leading "0x" tolerated).
   string data_hex = 4;
 }

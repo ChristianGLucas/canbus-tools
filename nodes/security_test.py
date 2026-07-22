@@ -33,14 +33,22 @@ def test_kcd_external_entity_is_not_resolved():
     ax = AxiomTestContext()
     result = parse_database(ax, ParseDatabaseInput(database=CanDatabase(content=_XXE_KCD, format="kcd")))
     # Either outcome is acceptable from a security standpoint (fail closed),
-    # but the entity's resolved content must never appear anywhere in the
-    # response, and the node must never crash — it returns a structured error.
+    # but the entity must never be resolved into the response, and the node
+    # must never crash — it returns a structured error. In practice the
+    # hardened parser rejects the external-entity declaration outright
+    # (INVALID_DATABASE), which is what we assert; the two checks below are
+    # a belt-and-suspenders guard against a future canmatrix/lxml upgrade
+    # silently reverting to entity resolution, on the (extremely unlikely)
+    # chance parsing then "succeeds" anyway.
+    assert result.error.code == "INVALID_DATABASE"
     serialized = str(result)
-    assert "root:" not in serialized  # /etc/hostname doesn't contain this, but
-    assert result.error.code in ("INVALID_DATABASE", "")
-    if result.error.code == "":
-        for m in result.messages:
-            assert "&xxe;" not in m.comment and "SYSTEM" not in m.comment
+    assert "&xxe;" not in serialized
+    try:
+        hostname = open("/etc/hostname").read().strip()
+    except OSError:
+        hostname = ""
+    if hostname:  # only a meaningful check where the target file actually exists
+        assert hostname not in serialized
 
 
 def test_oversized_database_content_is_rejected_before_parsing():

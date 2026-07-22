@@ -12,7 +12,6 @@ def test_encode_frame_by_name():
         EncodeFrameInput(
             database=DB,
             message_name="EngineData",
-            frame_id=-1,
             signal_values={"EngineSpeed": 1000.0, "EngineTemp": 25.0},
         ),
     )
@@ -39,7 +38,7 @@ def test_encode_frame_value_table_signal():
     ax = AxiomTestContext()
     result = encode_frame(
         ax,
-        EncodeFrameInput(database=DB, message_name="GearStatus", frame_id=-1, signal_values={"Gear": 2.0}),
+        EncodeFrameInput(database=DB, message_name="GearStatus", signal_values={"Gear": 2.0}),
     )
     assert result.error.code == ""
     assert result.data_hex == "02"
@@ -52,7 +51,6 @@ def test_encode_frame_multiplexed_signal():
         EncodeFrameInput(
             database=DB,
             message_name="MuxedFrame",
-            frame_id=-1,
             signal_values={"Selector": 1.0, "ValueB": 12.3},
         ),
     )
@@ -68,7 +66,6 @@ def test_encode_frame_strict_out_of_range_is_a_structured_error():
         EncodeFrameInput(
             database=DB,
             message_name="EngineData",
-            frame_id=-1,
             signal_values={"EngineTemp": 9999.0},
             strict=True,
         ),
@@ -85,7 +82,7 @@ def test_encode_frame_unknown_signal_name_is_a_structured_error_not_silently_ign
     result = encode_frame(
         ax,
         EncodeFrameInput(
-            database=DB, message_name="EngineData", frame_id=-1, signal_values={"EngineSpeeed": 100.0}
+            database=DB, message_name="EngineData", signal_values={"EngineSpeeed": 100.0}
         ),
     )
     assert result.error.code == "SIGNAL_NOT_FOUND"
@@ -94,14 +91,31 @@ def test_encode_frame_unknown_signal_name_is_a_structured_error_not_silently_ign
 def test_encode_frame_message_not_found_is_a_structured_error():
     ax = AxiomTestContext()
     result = encode_frame(
-        ax, EncodeFrameInput(database=DB, message_name="NoSuchMessage", frame_id=-1, signal_values={})
+        ax, EncodeFrameInput(database=DB, message_name="NoSuchMessage", signal_values={})
     )
     assert result.error.code == "MESSAGE_NOT_FOUND"
 
 
 def test_encode_frame_no_identifier_given_is_a_structured_error():
     ax = AxiomTestContext()
-    result = encode_frame(ax, EncodeFrameInput(database=DB, message_name="", frame_id=-1, signal_values={}))
+    result = encode_frame(ax, EncodeFrameInput(database=DB, message_name="", signal_values={}))
+    assert result.error.code == "INVALID_INPUT"
+
+
+def test_encode_frame_omitted_frame_id_is_not_confused_with_a_real_zero_id():
+    # Regression test: frame_id is `optional uint32` specifically so that a
+    # request which sets neither message_name nor frame_id can never be
+    # silently matched against a real message whose arbitration id happens
+    # to be 0 (proto3's bare-scalar zero value would be indistinguishable
+    # from "the caller didn't set this field").
+    ax = AxiomTestContext()
+    db_with_zero_id = CanDatabase(
+        content=DBC_FIXTURE.replace("BO_ 256 EngineData", "BO_ 0 ZeroIdFrame").replace(
+            "SG_ EngineSpeed", "SG_ ZeroFrameSignal"
+        ),
+        format="dbc",
+    )
+    result = encode_frame(ax, EncodeFrameInput(database=db_with_zero_id, signal_values={}))
     assert result.error.code == "INVALID_INPUT"
 
 
@@ -112,7 +126,6 @@ def test_encode_frame_non_finite_value_is_rejected():
         EncodeFrameInput(
             database=DB,
             message_name="EngineData",
-            frame_id=-1,
             signal_values={"EngineSpeed": float("nan")},
         ),
     )
