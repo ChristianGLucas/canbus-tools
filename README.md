@@ -1,6 +1,6 @@
 # canbus-tools
 
-Composable [Axiom](https://axiom.dev) nodes for automotive CAN-bus message
+Composable [Axiom](https://axiomide.com) nodes for automotive CAN-bus message
 encoding, decoding, and database introspection. Built for the Axiom
 marketplace (`christiangeorgelucas/canbus-tools`).
 
