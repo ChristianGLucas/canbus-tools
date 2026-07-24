@@ -3,7 +3,7 @@ bounds. Not a node-specific test file — imported nowhere, just discovered by
 pytest like the other *_test.py files.
 """
 from gen.messages_pb2 import CanDatabase, ParseDatabaseInput
-from nodes._can_lib import MAX_CONTENT_CHARS, MAX_FRAME_BYTES, hex_to_bytes, CanLibError
+from nodes._can_lib import MAX_FRAME_BYTES, hex_to_bytes, CanLibError
 from nodes.parse_database import parse_database
 from nodes.testkit import AxiomTestContext
 
@@ -49,13 +49,6 @@ def test_kcd_external_entity_is_not_resolved():
         hostname = ""
     if hostname:  # only a meaningful check where the target file actually exists
         assert hostname not in serialized
-
-
-def test_oversized_database_content_is_rejected_before_parsing():
-    ax = AxiomTestContext()
-    huge = "VERSION \"\"\n" + ("x" * (MAX_CONTENT_CHARS + 1))
-    result = parse_database(ax, ParseDatabaseInput(database=CanDatabase(content=huge, format="dbc")))
-    assert result.error.code == "TOO_LARGE"
 
 
 def test_oversized_hex_payload_is_rejected():

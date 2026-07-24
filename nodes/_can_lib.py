@@ -18,16 +18,11 @@ import canmatrix.formats
 import lxml.etree
 
 # --- Input bounds -----------------------------------------------------------
-# Real-world DBC/ARXML/KCD files range from a few KB to tens of MB for large
-# OEM-wide ARXML exports; this bound is generous headroom while still
-# stopping a caller from driving unbounded parse/compare cost.
-MAX_CONTENT_CHARS = 5_000_000
 # Classic CAN payload is <= 8 bytes; CAN FD extends this to <= 64 bytes.
-# Nothing legitimate exceeds 64.
+# Nothing legitimate exceeds 64 — this is a wire-format spec bound, not a
+# resource guard, so it stays even though payload/DoS limits are the
+# platform's job.
 MAX_FRAME_BYTES = 64
-# Bound on expanding a complex-multiplexer range group (SG_MUL_VAL_ m0-9999
-# style declarations) into individual ids.
-MAX_MULTIPLEXER_IDS = 1024
 
 SUPPORTED_LOAD_FORMATS = ("dbc", "kcd", "sym", "arxml")
 SUPPORTED_DUMP_FORMATS = ("dbc", "kcd", "sym")
@@ -110,11 +105,6 @@ def load_database(content: str, fmt: str) -> typing.Tuple["canmatrix.CanMatrix",
     format when `fmt` is empty. Returns (CanMatrix, resolved_format)."""
     if not content or not content.strip():
         raise CanLibError("INVALID_DATABASE", "database content is empty")
-    if len(content) > MAX_CONTENT_CHARS:
-        raise CanLibError(
-            "TOO_LARGE",
-            f"database content is {len(content)} chars, exceeds the {MAX_CONTENT_CHARS} bound",
-        )
     resolved = (fmt or "").strip().lower() or _sniff_format(content)
     if resolved not in SUPPORTED_LOAD_FORMATS:
         raise CanLibError("UNSUPPORTED_FORMAT", f"unsupported format: {fmt!r}")
@@ -163,12 +153,8 @@ def _multiplexer_ids(sig) -> typing.List[int]:
     ids: typing.List[int] = []
     for lo, hi in (sig.mux_val_grp or []):
         lo, hi = int(lo), int(hi)
-        if hi - lo > MAX_MULTIPLEXER_IDS:
-            hi = lo + MAX_MULTIPLEXER_IDS
         ids.extend(range(lo, hi + 1))
-        if len(ids) >= MAX_MULTIPLEXER_IDS:
-            break
-    return ids[:MAX_MULTIPLEXER_IDS]
+    return ids
 
 
 def signal_to_dict(sig) -> dict:

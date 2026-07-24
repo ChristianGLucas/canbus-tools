@@ -1,5 +1,5 @@
 name: christiangeorgelucas/canbus-tools
-version: 0.1.0
+version: 0.1.1
 language: python
 description: >-
   Composable Axiom nodes for automotive CAN-bus message encoding, decoding,
